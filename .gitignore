@@ -1,0 +1,9 @@
+*.exe
+*.obj
+*.pdb
+nob
+
+build/
+bin/
+
+*.html
