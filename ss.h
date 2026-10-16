@@ -1,5 +1,5 @@
 /**
- * ss.h - v1.0.0 - Copyright (c) 2026 Edoardo Figini
+ * ss.h - v1.1.0 - Copyright (c) 2026 Edoardo Figini
  * 
  * # String Slices in C
  *
@@ -27,7 +27,7 @@
  * #include <stdio.h>
  *
  * int main() {
- *   ss_t list = ss_from_cstr("apple, banana, cherry");
+ *   ss_t list = SS("apple, banana, cherry");
  *
  *   for (size_t i=0; i < 3; i++) {
  *     ss_t s = ss_tok(&list, ',');
@@ -51,12 +51,21 @@
  * This library offers presonalization through macros.
  * Before #include "ss.h" you can define macros to customize the library behavior:
  *   - `SS_DEF`: can be used to alter function declarations (e.g. `static inline`, 
- *               `extern "C"`, etc.)
+ *               `extern`, etc.)
  *               (defaults to nothing)
  *
  * 
  * ## Changelog
  *
+ *    1.1.0 (2026-10-16) New constructors 
+ *                       - Add ss constructor from ptr and length
+ *                       - Add SS static constructor from string literal
+ *                       - Add ss_from_extents constructor from pointer difference
+ *                       New manipulation functions accepting a function pointer
+ *                       for matching
+ *                       - Add ss_advance_while
+ *                       - Add ss_advance_while_in_place
+ *                       - Add ss_tok_while
  *    1.0.0 (2026-06-10) First public release
  *
  *
@@ -138,7 +147,19 @@ typedef struct {
  */
 #define SS_FMT(s) (int)(s).len, (s).data
 
-
+/*
+ * Creates a slice from poiter and size.  
+ * @param data the buffer (that owns the data) 
+ * @param len length of the view
+ * @return string slice 
+ */
+SS_DEF ss_t ss(const char* data, size_t len);
+/*
+ * Creates a slice from a C-string literal 
+ * (null terminated).  
+ * @param str string literal
+ */
+#define SS(str) (ss_t){ .data = (str), .len = sizeof((str)) - 1 }
 /*
  * Creates a slice from a C-string (null terminated).  
  * @param str the buffer (that owns the data) 
@@ -153,6 +174,18 @@ SS_DEF ss_t ss_from_cstr(const char* str);
 #define ss_from_sb(sb) \
   (ss_t){ .data = (sb).data, .len = (sb).len }
 // NOTE: keep this as macro to avoid having to #include "sb.h"
+
+/*
+ * Creates a slice from start and end pointers.
+ * `end` MUST be >= `start`.
+ * Use this function carefully: taking the difference between
+ * two pointers that do not point to contiguous memory may
+ * induce problems.
+ * @param start pointer to beginning of the string
+ * @param end pointer to end of the string
+ * @return string slice 
+ */
+SS_DEF ss_t ss_from_extents(const char* start, const char* end);
 
 /**
  * Converts the initial portion of the slice to int.
@@ -192,6 +225,14 @@ SS_DEF ss_t ss_advance_until(ss_t s, const char* str);
  * @return advanced slice (empty if str was not found)
  */
 SS_DEF ss_t ss_advance_after(ss_t s, const char* str);
+/**
+ * Returns a new slice advanced until the matching function
+ * returns false 
+ * @param s string slice
+ * @param f matching function 
+ * @return advanced slice (empty if str was not found)
+ */
+SS_DEF ss_t ss_advance_while(ss_t s, bool (*f)(char));
 
 /**
  * Trims whitespace from the beginning of the slice.
@@ -222,6 +263,15 @@ SS_DEF ss_t ss_trim(ss_t s);
  * @return string slice containing the token
  */
 SS_DEF ss_t ss_tok(ss_t* s, char chr);
+
+/**
+ * Tokenizes the slice while the matching function returns true. 
+ * Advances the slice pointing to the next token, and returns the token found.
+ * @param s pointer to the string slice to be tokenized
+ * @param f matching function 
+ * @return string slice containing the token
+ */
+SS_DEF ss_t ss_tok_while(ss_t* s, bool (*f)(char));
 
 /**
  * Extracts a sub-slice from the given slice.
@@ -318,6 +368,14 @@ SS_DEF bool ss_advance_until_in_place(ss_t* s, const char* str);
  * @return true if target was found, false otherwise
  */
 SS_DEF bool ss_advance_after_in_place(ss_t* s, const char* str);
+/**
+ * Advances a slice in place until the matching function
+ * returns false 
+ * @param s pointer to string slice
+ * @param f matching function 
+ * @return advanced slice (empty if str was not found)
+ */
+SS_DEF bool ss_advance_while_in_place(ss_t* s, bool (*f)(char));
 
 /**
  * Trims whitespace from the beginning of the slice in place.
@@ -337,13 +395,19 @@ SS_DEF void ss_trim_end_in_place(ss_t* s);
  */
 SS_DEF void ss_trim_in_place(ss_t* s);
 
-
 #endif // SS_H
 
 #ifdef SS_IMPLEMENTATION
 
 #include <string.h>
 #include <ctype.h>
+
+SS_DEF ss_t ss(const char* data, size_t len) {
+  return (ss_t){
+    .data = data,
+    .len = len,
+  };
+}
 
 SS_DEF ss_t ss_from_cstr(const char* str) {
   return (ss_t){
@@ -352,18 +416,11 @@ SS_DEF ss_t ss_from_cstr(const char* str) {
   };
 }
 
-SS_DEF ss_t ss_advance_by(ss_t s, size_t n) {
-  if (n > s.len) n = s.len;
-  return (ss_t) {
-    .data = s.data + n,
-    .len = s.len - n,
+SS_DEF ss_t ss_from_extents(const char* start, const char* end) {
+  return (ss_t){
+    .data = start,
+    .len = (end - start),
   };
-}
-
-SS_DEF void ss_advance_by_in_place(ss_t *s, size_t n) {
-  if (n > s->len) n = s->len;
-  s->data += n;
-  s->len -= n;
 }
 
 static inline int sized_atoi(const char* data, size_t size) {
@@ -431,6 +488,14 @@ SS_DEF ss_t ss_trim(ss_t s) {
   return out;
 }
 
+SS_DEF ss_t ss_advance_by(ss_t s, size_t n) {
+  if (n > s.len) n = s.len;
+  return (ss_t) {
+    .data = s.data + n,
+    .len = s.len - n,
+  };
+}
+
 SS_DEF ss_t ss_advance_until(ss_t s, const char* str) {
   while(!ss_starts_with_cstr(s, str) && s.len) { s.data++; s.len--; }
   return s; 
@@ -444,6 +509,17 @@ SS_DEF ss_t ss_advance_after(ss_t s, const char* str) {
   return s;
 }
 
+SS_DEF ss_t ss_advance_while(ss_t s, bool (*f)(char)) {
+  while(s.len && f(*s.data)) { s.data++; s.len--; }
+  return s; 
+}
+
+SS_DEF void ss_advance_by_in_place(ss_t *s, size_t n) {
+  if (n > s->len) n = s->len;
+  s->data += n;
+  s->len -= n;
+}
+
 SS_DEF bool ss_advance_until_in_place(ss_t* s, const char* str) {
   while(!ss_starts_with_cstr(*s, str) && s->len) { s->data++; s->len--; }
   return s->len;
@@ -454,6 +530,11 @@ SS_DEF bool ss_advance_after_in_place(ss_t* s, const char* str) {
   s->data += strlen(str);
   s->len -= strlen(str);
   return true;
+}
+
+SS_DEF bool ss_advance_while_in_place(ss_t* s, bool (*f)(char)) {
+  while(s->len && f(*s->data) && s->len) { s->data++; s->len--; }
+  return s->len; 
 }
 
 SS_DEF bool ss_eq(ss_t a, ss_t b) {
@@ -490,6 +571,12 @@ SS_DEF ss_t ss_tok(ss_t* s, char chr) {
   res.len = idx;
 
   return res;
+}
+
+SS_DEF ss_t ss_tok_while(ss_t* s, bool (*f)(char)) {
+  ss_t og = *s;
+  ss_advance_while_in_place(s, f);
+  return ss_from_extents(og.data, s->data);
 }
 
 SS_DEF ss_t ss_sub(ss_t s, size_t start, size_t end) {

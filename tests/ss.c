@@ -196,6 +196,189 @@ void test_ss_atof_trim_bug() {
     assert(val > 3.1f && val < 3.145f);
 }
 
+
+
+// --- Predicates for ss_advance_while tests ---
+
+static bool is_digit(char c) { return c >= '0' && c <= '9'; }
+static bool is_alpha(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
+
+// --- ss_advance_while tests ---
+
+// Matching prefix chars are skipped; the returned slice starts at the first non-match.
+void test_ss_advance_while_skips_matching_prefix() {
+    printf("Testing ss_advance_while skips matching prefix...\n");
+    ss_t s = ss_from_cstr("123abc");
+
+    ss_t result = ss_advance_while(s, is_digit);
+
+    // "123" consumed; "abc" (3 chars) remains
+    assert(result.len == 3);
+    assert(memcmp(result.data, "abc", 3) == 0);
+}
+
+// When the first char does not match, the returned slice equals the original.
+void test_ss_advance_while_no_match_returns_original() {
+    printf("Testing ss_advance_while with no match returns original...\n");
+    ss_t s = ss_from_cstr("abc123");
+
+    ss_t result = ss_advance_while(s, is_digit);
+
+    assert(result.len  == s.len);
+    assert(result.data == s.data);
+}
+
+// When every char matches, the returned slice is empty.
+void test_ss_advance_while_all_match_returns_empty() {
+    printf("Testing ss_advance_while with all chars matching returns empty...\n");
+    ss_t s = ss_from_cstr("12345");
+
+    ss_t result = ss_advance_while(s, is_digit);
+
+    assert(result.len == 0);
+}
+
+// ss_advance_while is value-returning; the original slice must be unmodified.
+void test_ss_advance_while_does_not_modify_original() {
+    printf("Testing ss_advance_while does not modify original slice...\n");
+    ss_t s = ss_from_cstr("999rest");
+    const char* original_data = s.data;
+    size_t      original_len  = s.len;
+
+    ss_advance_while(s, is_digit);
+
+    assert(s.data == original_data);
+    assert(s.len  == original_len);
+}
+
+// --- ss_advance_while_in_place tests ---
+
+// The slice is mutated: it starts at the first char that does not match.
+void test_ss_advance_while_in_place_mutates_slice() {
+    printf("Testing ss_advance_while_in_place mutates slice past matching prefix...\n");
+    ss_t s = ss_from_cstr("42abc");
+
+    ss_advance_while_in_place(&s, is_digit);
+
+    // "42" consumed; "abc" (3 chars) remains
+    assert(s.len == 3);
+    assert(memcmp(s.data, "abc", 3) == 0);
+}
+
+// Returns true when the slice still has characters after advancement.
+void test_ss_advance_while_in_place_returns_true_when_nonempty_remains() {
+    printf("Testing ss_advance_while_in_place returns true when remainder non-empty...\n");
+    ss_t s = ss_from_cstr("42abc");
+
+    bool result = ss_advance_while_in_place(&s, is_digit);
+
+    // "42" consumed, "abc" remains — non-empty → true
+    assert(result == true);
+}
+
+// Returns false when every character matched and the slice is now empty.
+void test_ss_advance_while_in_place_returns_false_when_fully_consumed() {
+    printf("Testing ss_advance_while_in_place returns false when fully consumed...\n");
+    ss_t s = ss_from_cstr("777");
+
+    bool result = ss_advance_while_in_place(&s, is_digit);
+
+    assert(result == false);
+    assert(s.len  == 0);
+}
+
+// When the first char does not match, the slice is unchanged and true is returned.
+void test_ss_advance_while_in_place_no_match_leaves_slice_unchanged() {
+    printf("Testing ss_advance_while_in_place with no match leaves slice unchanged...\n");
+    ss_t s = ss_from_cstr("abc");
+    const char* original_data = s.data;
+
+    bool result = ss_advance_while_in_place(&s, is_digit);
+
+    // slice still has content → true; nothing was consumed
+    assert(result == true);
+    assert(s.data == original_data);
+    assert(s.len  == 3);
+}
+
+// --- Corner-case tests ---
+
+// ss_advance_while: empty slice.
+// The loop evaluates f(*data) before checking len, so *data (the null terminator
+// of ss_from_cstr("")) is read.  As long as f('\0') is false the loop exits
+// immediately; len stays 0.
+void test_ss_advance_while_empty_slice_returns_empty() {
+    printf("Testing ss_advance_while on empty slice returns empty...\n");
+    ss_t s = ss_from_cstr("");
+
+    ss_t result = ss_advance_while(s, is_digit); // f('\0') == false → exits immediately
+
+    assert(result.len == 0);
+}
+
+// ss_advance_while_in_place: empty slice.
+// The len-first loop never calls f, so there is no read past the slice.
+// Returns false because len==0.
+void test_ss_advance_while_in_place_empty_slice_returns_false() {
+    printf("Testing ss_advance_while_in_place on empty slice returns false...\n");
+    ss_t s = ss_from_cstr("");
+
+    bool result = ss_advance_while_in_place(&s, is_digit);
+
+    assert(result == false);
+    assert(s.len  == 0);
+}
+
+// ss_advance_while: single matching char is consumed, result is empty.
+void test_ss_advance_while_single_matching_char_returns_empty() {
+    printf("Testing ss_advance_while single matching char returns empty...\n");
+    ss_t s = ss_from_cstr("7");
+
+    ss_t result = ss_advance_while(s, is_digit);
+
+    assert(result.len == 0);
+}
+
+// ss_advance_while_in_place: single matching char is consumed, slice becomes
+// empty and false is returned.
+void test_ss_advance_while_in_place_single_matching_char_empties_and_returns_false() {
+    printf("Testing ss_advance_while_in_place single matching char empties slice...\n");
+    ss_t s = ss_from_cstr("9");
+
+    bool result = ss_advance_while_in_place(&s, is_digit);
+
+    assert(result == false);
+    assert(s.len  == 0);
+}
+
+// ss_advance_while: sub-view respects len, does not read into the outer buffer.
+// Slice "123" is carved from "123xyz" with len=3.  A greedy is_digit predicate
+// must stop at the slice boundary, not at 'x' in the surrounding buffer.
+void test_ss_advance_while_stops_at_len_boundary() {
+    printf("Testing ss_advance_while stops at len boundary (sub-view)...\n");
+    // Arrange: a slice covering only the first 3 bytes of "123xyz"
+    const char* buf = "123xyz";
+    ss_t sub = { .data = buf, .len = 3 };
+
+    ss_t result = ss_advance_while(sub, is_digit);
+
+    // All 3 digits consumed; result must be empty, not point into "xyz"
+    assert(result.len == 0);
+}
+
+// ss_advance_while_in_place: sub-view respects len, does not read into the outer buffer.
+void test_ss_advance_while_in_place_stops_at_len_boundary() {
+    printf("Testing ss_advance_while_in_place stops at len boundary (sub-view)...\n");
+    const char* buf = "123xyz";
+    ss_t sub = { .data = buf, .len = 3 };
+
+    bool result = ss_advance_while_in_place(&sub, is_digit);
+
+    // All 3 digits consumed → empty → false
+    assert(result   == false);
+    assert(sub.len  == 0);
+}
+
 int main() {
     test_creation();
     test_trimming();
@@ -208,6 +391,24 @@ int main() {
     test_in_place_ops();
     test_ss_empty_prefix_bug();
     test_ss_atof_trim_bug();
+
+    // ss_advance_while / ss_advance_while_in_place — normal cases
+    test_ss_advance_while_skips_matching_prefix();
+    test_ss_advance_while_no_match_returns_original();
+    test_ss_advance_while_all_match_returns_empty();
+    test_ss_advance_while_does_not_modify_original();
+    test_ss_advance_while_in_place_mutates_slice();
+    test_ss_advance_while_in_place_returns_true_when_nonempty_remains();
+    test_ss_advance_while_in_place_returns_false_when_fully_consumed();
+    test_ss_advance_while_in_place_no_match_leaves_slice_unchanged();
+
+    // ss_advance_while / ss_advance_while_in_place — corner cases
+    test_ss_advance_while_empty_slice_returns_empty();
+    test_ss_advance_while_in_place_empty_slice_returns_false();
+    test_ss_advance_while_single_matching_char_returns_empty();
+    test_ss_advance_while_in_place_single_matching_char_empties_and_returns_false();
+    test_ss_advance_while_stops_at_len_boundary();
+    test_ss_advance_while_in_place_stops_at_len_boundary();
 
     printf("\nAll ss.h tests passed successfully!\n");
     return 0;
