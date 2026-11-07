@@ -1,7 +1,9 @@
+#include "test.h"
+
 #define VEC_IMPLEMENTATION
 #include "vec.h"
+
 #include <stdio.h>
-#include <assert.h>
 #include <string.h>
 
 // --- Helper Types ---
@@ -28,8 +30,7 @@ int compare_cstrs(const void* a, const void* b) {
 
 // --- Test Cases ---
 
-void test_vec_basic_push_pop() {
-    printf("Testing basic push and get...\n");
+bool basic_push_pop() {
     ints_t nums = { 0 };
     
     vec_push(&nums, 10);
@@ -43,10 +44,11 @@ void test_vec_basic_push_pop() {
 
     vec_clear(&nums);
     assert(vec_len(&nums) == 0);
+
+    return true;
 }
 
-void test_vec_sorting() {
-    printf("Testing vector sorting...\n");
+bool sorting() {
     ints_t nums = { 0 };
     vec_push(&nums, 67);
     vec_push(&nums, 80085);
@@ -59,10 +61,11 @@ void test_vec_sorting() {
     assert(vec_get(&nums, 2) == 80085);
 
     vec_clear(&nums);
+
+    return true;
 }
 
-void test_vec_removal() {
-    printf("Testing removal (ordered vs unordered)...\n");
+bool removal() {
     ints_t nums = { 0 };
     vec_push(&nums, 1);
     vec_push(&nums, 2);
@@ -83,10 +86,11 @@ void test_vec_removal() {
     assert(vec_get(&nums, 0) == 4);
 
     vec_clear(&nums);
+
+    return true;
 }
 
-void test_vec_string_manipulation() {
-    printf("Testing string vector operations...\n");
+bool string_manipulation() {
     cstrs_t strings = { 0 };
     
     vec_push(&strings, "Zebra");
@@ -104,10 +108,11 @@ void test_vec_string_manipulation() {
     assert(strcmp(vec_get(&strings, 1), "Banana") == 0);
 
     vec_clear(&strings);
+
+    return true;
 }
 
-void test_vec_copy() {
-  printf("Testing vec copy...\n");
+bool copy() {
   ints_t nums = { 0 };
   vec_push(&nums, 67);
   vec_push(&nums, 80085);
@@ -139,10 +144,11 @@ void test_vec_copy() {
   
   vec_clear(&src);
   vec_clear(&dst);
+
+    return true;
 }
 
-void test_vec_indexof() {
-    printf("Testing vec_indexof...\n");
+bool indexof() {
     ints_t nums = { 0 };
     vec_push(&nums, 10);
     vec_push(&nums, 20);
@@ -154,10 +160,11 @@ void test_vec_indexof() {
     assert(idx == 1);
     
     vec_clear(&nums);
+
+    return true;
 }
 
-void test_vec_extra_ops() {
-    printf("Testing extra operations (pop, first, last, is_empty, set, swap, etc)...\n");
+bool extra_ops() {
     ints_t nums = { 0 };
     
     assert(vec_is_empty(&nums));
@@ -192,10 +199,11 @@ void test_vec_extra_ops() {
     assert(vec_cap(&nums) > 0);
     
     vec_clear(&nums);
+
+    return true;
 }
 
-void test_vec_capacity_and_sizes() {
-    printf("Testing capacity, shrink, and sizes...\n");
+bool capacity_and_sizes() {
     ints_t nums = { 0 };
     
     assert(vec_cap(&nums) == 0);
@@ -218,10 +226,11 @@ void test_vec_capacity_and_sizes() {
     assert(vec_len(&nums) == 3);
     
     vec_clear(&nums);
+
+    return true;
 }
 
-void test_vec_foreach() {
-    printf("Testing foreach...\n");
+bool foreach() {
     ints_t nums = { 0 };
     
     vec_push(&nums, 1);
@@ -235,6 +244,8 @@ void test_vec_foreach() {
     assert(sum == 6);
     
     vec_clear(&nums);
+
+    return true;
 }
 
 // --- Helper for function-call-as-index tests ---
@@ -250,7 +261,7 @@ int get_index(int idx) {
 
 // vec_get evaluates idx twice: once for the bounds check, once for the access.
 // Passing a pre-increment should only advance the counter once.
-void test_vec_get_no_double_eval() {
+bool get_no_double_eval() {
     ints_t nums = { 0 };
     vec_push(&nums, 100);
     vec_push(&nums, 200);
@@ -262,10 +273,12 @@ void test_vec_get_no_double_eval() {
     assert(i == 1);
 
     vec_clear(&nums);
+
+    return true;
 }
 
 // Same test but using a function call to observe side effects.
-void test_vec_get_function_call_idx() {
+bool get_function_call_idx() {
     ints_t nums = { 0 };
     vec_push(&nums, 10);
     vec_push(&nums, 20);
@@ -277,10 +290,12 @@ void test_vec_get_function_call_idx() {
     assert(call_count == 1);
 
     vec_clear(&nums);
+
+    return true;
 }
 
 // vec_set also goes through vec_get, so the same double-eval applies.
-void test_vec_set_no_double_eval() {
+bool set_no_double_eval() {
     ints_t nums = { 0 };
     vec_push(&nums, 10);
     vec_push(&nums, 20);
@@ -293,9 +308,11 @@ void test_vec_set_no_double_eval() {
     assert(i == 2);
 
     vec_clear(&nums);
+
+    return true;
 }
 
-void test_vec_set_function_call_idx() {
+bool set_function_call_idx() {
     ints_t nums = { 0 };
     vec_push(&nums, 10);
     vec_push(&nums, 20);
@@ -306,11 +323,13 @@ void test_vec_set_function_call_idx() {
     assert(call_count == 1);
 
     vec_clear(&nums);
+
+    return true;
 }
 
 // vec_swap, vec_remove_unordered, vec_copy all use do{...}while(0)
 // These tests verify that macros work inside single-statement if/else.
-void test_vec_swap_in_single_stmt_if() {
+bool swap_in_single_stmt_if() {
     ints_t nums = { 0 };
     vec_push(&nums, 1);
     vec_push(&nums, 2);
@@ -326,9 +345,11 @@ void test_vec_swap_in_single_stmt_if() {
     assert(vec_get(&nums, 2) == 1);
 
     vec_clear(&nums);
+
+    return true;
 }
 
-void test_vec_remove_unordered_in_single_stmt_if() {
+bool remove_unordered_in_single_stmt_if() {
     ints_t nums = { 0 };
     vec_push(&nums, 10);
     vec_push(&nums, 20);
@@ -343,9 +364,11 @@ void test_vec_remove_unordered_in_single_stmt_if() {
     assert(vec_len(&nums) == 2);
 
     vec_clear(&nums);
+
+    return true;
 }
 
-void test_vec_copy_in_single_stmt_if() {
+bool copy_in_single_stmt_if() {
     ints_t nums = { 0 };
     vec_push(&nums, 5);
     vec_push(&nums, 6);
@@ -365,12 +388,13 @@ void test_vec_copy_in_single_stmt_if() {
     vec_clear(&nums);
     vec_clear(&dst);
     vec_clear(&alt);
+
+    return true;
 }
 
 // vec_push should also work inside single-statement if (it's an expression,
 // but let's verify it doesn't have a trailing semicolon issue).
-void test_vec_push_in_single_stmt_if() {
-    printf("Testing vec_push in single-statement if/else...\n");
+bool push_in_single_stmt_if() {
     ints_t nums = { 0 };
 
     int flag = 1;
@@ -383,11 +407,12 @@ void test_vec_push_in_single_stmt_if() {
     assert(vec_get(&nums, 0) == 42);
 
     vec_clear(&nums);
+
+    return true;
 }
 
 // vec_set should also work inside single-statement if.
-void test_vec_set_in_single_stmt_if() {
-    printf("Testing vec_set in single-statement if/else...\n");
+bool set_in_single_stmt_if() {
     ints_t nums = { 0 };
     vec_push(&nums, 0);
 
@@ -400,11 +425,12 @@ void test_vec_set_in_single_stmt_if() {
     assert(vec_get(&nums, 0) == 77);
 
     vec_clear(&nums);
+
+    return true;
 }
 
 // Pop all elements, verify count goes to 0 correctly.
-void test_vec_pop_drain() {
-    printf("Testing popping all elements...\n");
+bool pop_drain() {
     ints_t nums = { 0 };
     vec_push(&nums, 1);
     vec_push(&nums, 2);
@@ -417,11 +443,12 @@ void test_vec_pop_drain() {
     assert(vec_len(&nums) == 0);
 
     vec_clear(&nums);
+
+    return true;
 }
 
 // Use vec_remove with a function-call index.
-void test_vec_remove_function_call_idx() {
-    printf("Testing vec_remove with function-call idx...\n");
+bool remove_function_call_idx() {
     ints_t nums = { 0 };
     vec_push(&nums, 10);
     vec_push(&nums, 20);
@@ -436,12 +463,13 @@ void test_vec_remove_function_call_idx() {
     assert(call_count == 1);
 
     vec_clear(&nums);
+
+    return true;
 }
 
 // Test that vec_swap with pre-increment indices doesn't double-evaluate.
 // vec_swap caches idxa/idxb with __typeof__, so this should be safe.
-void test_vec_swap_no_double_eval() {
-    printf("Testing vec_swap does not double-evaluate idx...\n");
+bool swap_no_double_eval() {
     ints_t nums = { 0 };
     vec_push(&nums, 100);
     vec_push(&nums, 200);
@@ -457,11 +485,12 @@ void test_vec_swap_no_double_eval() {
     assert(vec_get(&nums, 2) == 100);
 
     vec_clear(&nums);
+
+    return true;
 }
 
 // Test vec_remove_unordered with pre-increment (idx passed to vec_swap which caches).
-void test_vec_remove_unordered_no_double_eval() {
-    printf("Testing vec_remove_unordered does not double-evaluate idx...\n");
+bool remove_unordered_no_double_eval() {
     ints_t nums = { 0 };
     vec_push(&nums, 10);
     vec_push(&nums, 20);
@@ -474,11 +503,12 @@ void test_vec_remove_unordered_no_double_eval() {
     assert(vec_len(&nums) == 2);
 
     vec_clear(&nums);
+
+    return true;
 }
 
 // Verify growth: push enough items to trigger multiple reallocations.
-void test_vec_growth() {
-    printf("Testing vector growth over many pushes...\n");
+bool growth() {
     ints_t nums = { 0 };
     int n = 100;
     for (int i = 0; i < n; i++) {
@@ -492,11 +522,12 @@ void test_vec_growth() {
     }
 
     vec_clear(&nums);
+
+    return true;
 }
 
 // Verify that vec_data returns a pointer we can use directly.
-void test_vec_data_direct_access() {
-    printf("Testing direct data pointer access...\n");
+bool data_direct_access() {
     ints_t nums = { 0 };
     vec_push(&nums, 11);
     vec_push(&nums, 22);
@@ -512,10 +543,11 @@ void test_vec_data_direct_access() {
     assert(vec_get(&nums, 1) == 99);
 
     vec_clear(&nums);
+
+    return true;
 }
 
-void test_vec_nested() {
-    printf("Testing nested vectors...\n");
+bool nested() {
     VEC(ints_t) matrix = { 0 };
 
     ints_t row1 = { 0 };
@@ -548,10 +580,11 @@ void test_vec_nested() {
     vec_clear(r1);
     vec_clear(r2);
     vec_clear(&matrix);
+
+    return true;
 }
 
-void test_vec_reserve_preserves_data() {
-    printf("Testing vec_reserve preserves data...\n");
+bool reserve_preserves_data() {
     VEC(int) v = {0};
     vec_push(&v, 10);
     vec_push(&v, 20);
@@ -561,6 +594,8 @@ void test_vec_reserve_preserves_data() {
     assert(vec_get(&v, 0) == 10);
     assert(vec_get(&v, 1) == 20);
     vec_clear(&v);
+
+    return true;
 }
 
 typedef struct {
@@ -568,8 +603,7 @@ typedef struct {
     float value;
 } my_struct_t;
 
-void test_vec_swap_non_integer() {
-    printf("Testing vec_swap with floats...\n");
+bool swap_non_integer() {
     VEC(float) vf = {0};
     vec_push(&vf, 1.1f);
     vec_push(&vf, 2.2f);
@@ -578,10 +612,11 @@ void test_vec_swap_non_integer() {
     
     assert(vec_get(&vf, 0) > 2.1f && vec_get(&vf, 0) < 2.3f);
     vec_clear(&vf);
+
+    return true;
 }
 
-void test_vec_remove_unordered_struct() {
-    printf("Testing vec_remove_unordered with structs...\n");
+bool remove_unordered_struct() {
     VEC(my_struct_t) vs = {0};
     my_struct_t a = {1, 1.1f};
     my_struct_t b = {2, 2.2f};
@@ -592,11 +627,12 @@ void test_vec_remove_unordered_struct() {
     
     assert(vec_get(&vs, 0).id == 2);
     vec_clear(&vs);
+
+    return true;
 }
 
 
-void test_vec_reserve_smaller_capacity() {
-    printf("Testing vec_reserve with smaller capacity...\n");
+bool reserve_smaller_capacity() {
     VEC(int) v = {0};
     vec_reserve(&v, 10);
     vec_push(&v, 1);
@@ -616,41 +652,43 @@ void test_vec_reserve_smaller_capacity() {
     assert(v.data == old_data);
     
     vec_clear(&v);
+
+    return true;
 }
 
 int main() {
-    test_vec_basic_push_pop();
-    test_vec_sorting();
-    test_vec_removal();
-    test_vec_string_manipulation();
-    test_vec_copy();
-    test_vec_extra_ops();
-    test_vec_capacity_and_sizes();
-    test_vec_indexof();
-    test_vec_foreach();
+    TEST(basic_push_pop);
+    TEST(sorting);
+    TEST(removal);
+    TEST(string_manipulation);
+    TEST(copy);
+    TEST(extra_ops);
+    TEST(capacity_and_sizes);
+    TEST(indexof);
+    TEST(foreach);
 
     // Corner-case tests
-    test_vec_get_no_double_eval();
-    test_vec_get_function_call_idx();
-    test_vec_set_no_double_eval();
-    test_vec_set_function_call_idx();
-    test_vec_swap_in_single_stmt_if();
-    test_vec_remove_unordered_in_single_stmt_if();
-    test_vec_copy_in_single_stmt_if();
-    test_vec_push_in_single_stmt_if();
-    test_vec_set_in_single_stmt_if();
-    test_vec_pop_drain();
-    test_vec_remove_function_call_idx();
-    test_vec_swap_no_double_eval();
-    test_vec_remove_unordered_no_double_eval();
-    test_vec_growth();
-    test_vec_data_direct_access();
-    test_vec_nested();
-    test_vec_reserve_preserves_data();
-    test_vec_swap_non_integer();
-    test_vec_remove_unordered_struct();
-    test_vec_reserve_smaller_capacity();
+    TEST(get_no_double_eval);
+    TEST(get_function_call_idx);
+    TEST(set_no_double_eval);
+    TEST(set_function_call_idx);
+    TEST(swap_in_single_stmt_if);
+    TEST(remove_unordered_in_single_stmt_if);
+    TEST(copy_in_single_stmt_if);
+    TEST(push_in_single_stmt_if);
+    TEST(set_in_single_stmt_if);
+    TEST(pop_drain);
+    TEST(remove_function_call_idx);
+    TEST(swap_no_double_eval);
+    TEST(remove_unordered_no_double_eval);
+    TEST(growth);
+    TEST(data_direct_access);
+    TEST(nested);
+    TEST(reserve_preserves_data);
+    TEST(swap_non_integer);
+    TEST(remove_unordered_struct);
+    TEST(reserve_smaller_capacity);
 
-    printf("\nAll vec.h tests passed successfully!\n");
+    REPORT("vec.h");
     return 0;
 }

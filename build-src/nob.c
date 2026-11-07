@@ -71,9 +71,10 @@ const char* tc_dbg[] = {
 };
 
 // Default toolchain
-// Edit this based on platform
-#ifdef _WIN32
+#ifdef _MSC_VER
 #define DEFAULT_TOOLCHAIN T_MSVC
+#elif __clang__
+#define DEFAULT_TOOLCHAIN T_LLVM
 #else
 #define DEFAULT_TOOLCHAIN T_GNU
 #endif
@@ -214,6 +215,7 @@ typedef struct {
     size_t count;
     size_t capacity;
   } tests;
+  const char* target;
 } walk_data_t;
 
 typedef enum {
@@ -249,6 +251,24 @@ const char* supported_bts() {
   for (size_t i = 1; i < COUNT_BUILD_TYPES; i++) {
     nob_sb_appendf(&sb, ", %s", bt_names[i]);
   }
+
+  return nob_temp_sprintf("%.*s", (int)sb.count, sb.items);
+}
+
+const char* targets() {
+  Nob_File_Paths tests = {0};
+  Nob_String_Builder sb = { 0 };
+
+  bool first = true;
+  if (nob_read_entire_dir("tests", &tests)) {
+    for (size_t i = 0; i < tests.count; ++i) {
+      Nob_String_View test = nob_sv_from_cstr(tests.items[i]);
+      if (!nob_sv_chop_suffix(&test, SVLIT(".c"))) continue;
+      nob_sb_appendf(&sb, "%s" SV_Fmt, first ? "" : ", ", SV_Arg(test));
+      first = false;
+    }
+  }
+  nob_da_free(tests);
 
   return nob_temp_sprintf("%.*s", (int)sb.count, sb.items);
 }
@@ -312,7 +332,8 @@ bool compile_and_run_test(Nob_Walk_Entry entry) {
 
   Nob_String_View path = nob_sv_from_cstr(entry.path);
 
-  if (!nob_sv_ends_with_cstr(path, ".c")) return true;
+  if (!nob_sv_chop_suffix(&path, SVLIT(".c"))) return true;
+  if (wd->target != NULL && !nob_sv_ends_with(path, nob_sv_from_cstr(wd->target))) return true;
 
   test_t test = { 0 };
   test.src_path = nob_temp_strdup(entry.path);
@@ -349,6 +370,7 @@ bool run_in_msvc_env(int argc, char** argv) {
 #endif
 
 void log_test_outcome(const test_t* test);
+void report(size_t passed, size_t failed, size_t not_comp, size_t tot);
 
 int main(int argc, char **argv)
 {
@@ -357,7 +379,7 @@ int main(int argc, char **argv)
 
     nob_set_log_handler(nob_color_log_handler);
 
-    if (!nob_sv_end_with(nob_sv_from_cstr(binary_path), ".exe")) {
+    if (!nob_sv_ends_with(nob_sv_from_cstr(binary_path), SVLIT(".exe"))) {
       binary_path = nob_temp_sprintf("%s.exe", binary_path);
     }
 
@@ -377,11 +399,16 @@ int main(int argc, char **argv)
       bt_names[BT_DEBUG], 
       nob_temp_sprintf("Select the build type. Available build types: [%s]", supported_bts())
     );
-    bool *f_test = flag_bool(
+    char **f_test = flag_str(
       "test",
-      false,
-      "Build and run tests."
+      "all",
+      nob_temp_sprintf("Build and run selected test. Available tests: [%s, all]", targets())
     );
+    // char **f_target = flag_str(
+    //   "target", 
+    //   NULL, 
+    //   nob_temp_sprintf("Select the compilation/test target. Available targets: [%s]", targets())
+    // );
 
     const char* exe = argv[0];
 
@@ -432,17 +459,24 @@ int main(int argc, char **argv)
 
     uint64_t start = nob_nanos_since_unspecified_epoch();
 
+
     if (*f_test) {
-      size_t failed = 0;
+      nob_log(NOB_INFO, "Selected: %s", *f_test);
 
       walk_data_t wd = { 0 };
+      if (strcmp("all", *f_test) != 0) wd.target = *f_test;
+
+      size_t failed = 0;
+      size_t not_comp = 0;
+
       if(!nob_walk_dir(TESTS_FOLDER, compile_and_run_test, .data = &wd)) return 1;
       da_foreach(test_t, t, &wd.tests) {
-        if(!t->passed) failed++;
+        if     (!t->compiled) not_comp++;
+        else if(!t->passed)   failed++;
       }
 
-      fprintf(stderr, "\n\n");
-      nob_log(NOB_INFO, "Passed %zu of %zu tests:", wd.tests.count - failed, wd.tests.count);
+      report( wd.tests.count - (failed + not_comp), failed, not_comp, wd.tests.count);
+
       da_foreach(test_t, t, &wd.tests) {
         log_test_outcome(t);
       }
@@ -493,6 +527,18 @@ void log_test_outcome(const test_t* test) {
 
   Nob_String_View sv = nob_sb_to_sv(sb);
   fprintf(stdout, SV_Fmt, SV_Arg(sv));
+}
+
+void report(size_t passed, size_t failed, size_t not_comp, size_t tot) {
+  fprintf(stderr, "\n\n");
+  printf(
+      "Final: "
+      ANSI_PRE ANSI_GREEN_T  ";" ANSI_BOLD ANSI_POST "%3zu" ANSI_PRE ANSI_NONE ANSI_POST " passed, "
+      ANSI_PRE ANSI_RED_T    ";" ANSI_BOLD ANSI_POST "%3zu" ANSI_PRE ANSI_NONE ANSI_POST " failed, "
+      ANSI_PRE ANSI_YELLOW_T ";" ANSI_BOLD ANSI_POST "%3zu" ANSI_PRE ANSI_NONE ANSI_POST " did not compile / "
+      ANSI_PRE                   ANSI_BOLD ANSI_POST "%3zu" ANSI_PRE ANSI_NONE ANSI_POST " total\n",
+      passed, failed, not_comp, tot 
+  );
 }
 
 #define LOG_COLOR_RESET "\033[0m"
