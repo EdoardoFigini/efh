@@ -1,3 +1,5 @@
+#include "test.h"
+
 #ifdef _WIN32
 #include <windows.h>
 #else
@@ -19,42 +21,43 @@ static void* my_realloc(void* ptr, size_t count, size_t size) {
 #define SB_IMPLEMENTATION
 #define SB_DEF static
 #include "sb.h"
+
 #include <stdio.h>
-#include <assert.h>
 #include <string.h>
 
-void test_sb_basic_append() {
-    printf("Testing basic append...\n");
+bool sb_basic_append() {
     sb_t sb = {0};
 
     sb_append(&sb, "Hello");
-    assert(sb.len == 5);
-    assert(memcmp(sb.data, "Hello", 5) == 0);
+    TEST_ASSERT(sb.len == 5);
+    TEST_ASSERT(memcmp(sb.data, "Hello", 5) == 0);
 
     sb_append(&sb, " World");
-    assert(sb.len == 11);
-    assert(memcmp(sb.data, "Hello World", 11) == 0);
+    TEST_ASSERT(sb.len == 11);
+    TEST_ASSERT(memcmp(sb.data, "Hello World", 11) == 0);
 
     sb_free(&sb);
-    assert(sb.data == NULL);
+    TEST_ASSERT(sb.data == NULL);
+
+    return true;
 }
 
-void test_sb_formatting() {
-    printf("Testing formatted append...\n");
+bool sb_formatting() {
     sb_t sb = {0};
 
     int age = 25;
     const char* name = "John Doe";
     sb_appendf(&sb, "Name: %s, Age: %d", name, age);
 
-    assert(sb.len == 23); 
-    assert(strcmp(sb.data, "Name: John Doe, Age: 25") == 0);
+    TEST_ASSERT(sb.len == 23); 
+    TEST_ASSERT(strcmp(sb.data, "Name: John Doe, Age: 25") == 0);
 
     sb_free(&sb);
+
+    return true;
 }
 
-void test_sb_growth() {
-    printf("Testing capacity growth...\n");
+bool sb_growth() {
     sb_t sb = {0};
 
     // Force multiple reallocations by appending a long string
@@ -63,37 +66,39 @@ void test_sb_growth() {
         sb_append(&sb, long_str);
     }
 
-    assert(sb.len == 200);
-    assert(sb.cap >= 200);
+    TEST_ASSERT(sb.len == 200);
+    TEST_ASSERT(sb.cap >= 200);
     // Ensure the bit-manipulation in sb_reserve results in power-of-two
-    assert((sb.cap & (sb.cap - 1)) == 0);
+    TEST_ASSERT((sb.cap & (sb.cap - 1)) == 0);
 
     sb_free(&sb);
+
+    return true;
 }
 
-void test_sb_file_io() {
-    printf("Testing file I/O...\n");
+bool sb_file_io() {
     sb_t out = {0};
     const char* filename = "test_sb_output.tmp";
     const char* content = "File System Test Content";
 
     sb_append(&out, content);
     int written = sb_write_to_file(filename, &out);
-    assert(written > 0);
+    TEST_ASSERT(written > 0);
 
     sb_t in = {0};
     int read = sb_read_file(filename, &in);
-    assert(read == (int)strlen(content));
-    assert(memcmp(in.data, content, read) == 0);
+    TEST_ASSERT(read == (int)strlen(content));
+    TEST_ASSERT(memcmp(in.data, content, read) == 0);
 
     // Cleanup
     sb_free(&out);
     sb_free(&in);
     remove(filename);
+
+    return true;
 }
 
-void test_sb_reset_and_concat() {
-    printf("Testing reset and concat...\n");
+bool sb_reset_and_concat() {
     sb_t a = {0};
     sb_t b = {0};
 
@@ -101,49 +106,53 @@ void test_sb_reset_and_concat() {
     sb_append(&b, "Part B");
 
     sb_concat(&a, &b);
-    assert(a.len == 12);
-    assert(memcmp(a.data, "Part APart B", 12) == 0);
+    TEST_ASSERT(a.len == 12);
+    TEST_ASSERT(memcmp(a.data, "Part APart B", 12) == 0);
 
     sb_reset(&a);
-    assert(a.len == 0);
+    TEST_ASSERT(a.len == 0);
     // data should still be allocated
-    assert(a.data != NULL);
+    TEST_ASSERT(a.data != NULL);
 
     sb_free(&a);
     sb_free(&b);
+
+    return true;
 }
 
-void test_sb_n_append() {
-    printf("Testing sb_n_append...\n");
+bool test_sb_n_append() {
     sb_t sb = {0};
     sb_n_append(&sb, "Hello World", 5);
-    assert(sb.len == 5);
-    assert(memcmp(sb.data, "Hello", 5) == 0);
+    TEST_ASSERT(sb.len == 5);
+    TEST_ASSERT(memcmp(sb.data, "Hello", 5) == 0);
     sb_free(&sb);
+
+    return true;
 }
 
-void test_sb_appendln() {
-    printf("Testing sb_appendln...\n");
+bool test_sb_appendln() {
     sb_t sb = {0};
     sb_appendln(&sb, "Line");
-    assert(sb.len == 5);
-    assert(sb.data[4] == '\n');
-    assert(memcmp(sb.data, "Line\n", 5) == 0);
+    TEST_ASSERT(sb.len == 5);
+    TEST_ASSERT(sb.data[4] == '\n');
+    TEST_ASSERT(memcmp(sb.data, "Line\n", 5) == 0);
     sb_free(&sb);
+
+    return true;
 }
 
-void test_sb_appendz() {
-    printf("Testing sb_appendz...\n");
+bool test_sb_appendz() {
     sb_t sb = {0};
     sb_appendz(&sb, "Zero");
-    assert(sb.len == 5);
-    assert(sb.data[4] == '\0');
-    assert(memcmp(sb.data, "Zero\0", 5) == 0);
+    TEST_ASSERT(sb.len == 5);
+    TEST_ASSERT(sb.data[4] == '\0');
+    TEST_ASSERT(memcmp(sb.data, "Zero\0", 5) == 0);
     sb_free(&sb);
+
+    return true;
 }
 
-void test_sb_append_to_file() {
-    printf("Testing sb_append_to_file...\n");
+bool test_sb_append_to_file() {
     const char* filename = "test_sb_append_output.tmp";
     sb_t sb1 = {0};
     sb_append(&sb1, "First line\n");
@@ -155,36 +164,38 @@ void test_sb_append_to_file() {
 
     sb_t in = {0};
     sb_read_file(filename, &in);
-    assert(in.len == 22);
-    assert(memcmp(in.data, "First line\nSecond line", 22) == 0);
+    TEST_ASSERT(in.len == 22);
+    TEST_ASSERT(memcmp(in.data, "First line\nSecond line", 22) == 0);
 
     sb_free(&sb1);
     sb_free(&sb2);
     sb_free(&in);
     remove(filename);
+
+    return true;
 }
 
-void test_sb_reserve_power_of_two() {
-    printf("Testing sb_reserve power of 2 behavior...\n");
+bool sb_reserve_power_of_two() {
     sb_t sb = {0};
     
     sb_reserve(&sb, 3);
-    assert(sb.cap == 4);
+    TEST_ASSERT(sb.cap == 4);
 
     sb_reserve(&sb, 17);
-    assert(sb.cap == 32);
+    TEST_ASSERT(sb.cap == 32);
 
     sb_reserve(&sb, 100);
-    assert(sb.cap == 128);
+    TEST_ASSERT(sb.cap == 128);
 
     sb_reserve(&sb, 1025);
-    assert(sb.cap == 2048);
+    TEST_ASSERT(sb.cap == 2048);
 
     sb_free(&sb);
+
+    return true;
 }
 
-void test_sb_n_append_state_corruption() {
-    printf("Testing sb_n_append state corruption on failure...\n");
+bool sb_n_append_state_corruption() {
     sb_t sb = {0};
     sb_append(&sb, "A"); 
     
@@ -192,36 +203,38 @@ void test_sb_n_append_state_corruption() {
     
     // Request a gigantic append that will fail allocation
     int res = sb_n_append(&sb, "B", ((size_t)-1) / 4);
-    assert(res == -1); // Allocation should fail
+    TEST_ASSERT(res == -1); // Allocation should fail
     
-    assert(sb.data != NULL);
-    assert(sb.cap == old_cap); 
+    TEST_ASSERT(sb.data != NULL);
+    TEST_ASSERT(sb.cap == old_cap); 
     
     sb_free(&sb);
+
+    return true;
 }
 
-void test_sb_appendf_preallocated() {
-    printf("Testing sb_appendf on preallocated buffer...\n");
+bool sb_appendf_preallocated() {
     sb_t sb = {0};
     sb_reserve(&sb, 100);
     
     int res = sb_appendf(&sb, "Hello %s", "World");
-    assert(res == 11);
-    assert(sb.len == 11);
-    assert(strcmp(sb.data, "Hello World") == 0);
+    TEST_ASSERT(res == 11);
+    TEST_ASSERT(sb.len == 11);
+    TEST_ASSERT(strcmp(sb.data, "Hello World") == 0);
 
     sb_reset(&sb);
 
     res = sb_appendln(&sb, "Hello World");
-    assert(res == 12);
-    assert(sb.len == 12);
-    assert(strcmp(sb.data, "Hello World\n") == 0);
+    TEST_ASSERT(res == 12);
+    TEST_ASSERT(sb.len == 12);
+    TEST_ASSERT(strcmp(sb.data, "Hello World\n") == 0);
     
     sb_free(&sb);
+
+    return true;
 }
 
-void test_sb_n_append_realloc_bug() {
-    printf("Testing sb_n_append does not realloc unnecessarily...\n");
+bool sb_n_append_realloc_bug() {
     sb_t sb = {0};
     
     sb_append(&sb, "A");
@@ -232,13 +245,14 @@ void test_sb_n_append_realloc_bug() {
     sb_append(&sb, "C");
     sb_append(&sb,  "D");
     
-    assert(g_realloc_count == initial_reallocs);
+    TEST_ASSERT(g_realloc_count == initial_reallocs);
     
     sb_free(&sb);
+
+    return true;
 }
 
-void test_sb_oom_crashes() {
-    printf("Testing sb_appendln and sb_appendf OOM...\n");
+bool sb_oom_crashes() {
     sb_t sb = {0};
     sb_reserve(&sb, 16);
     
@@ -247,39 +261,40 @@ void test_sb_oom_crashes() {
     void* data = sb.data;
     size_t cap = sb.cap;
     
-    assert(sb_appendln(&sb, "0123456789") == -1);
+    TEST_ASSERT(sb_appendln(&sb, "0123456789") == -1);
     // sb should remain unchanged
-    assert(sb.len == ((size_t)-1) - 10);
-    assert(data == sb.data);
-    assert(cap == sb.cap);
+    TEST_ASSERT(sb.len == ((size_t)-1) - 10);
+    TEST_ASSERT(data == sb.data);
+    TEST_ASSERT(cap == sb.cap);
     
-    assert(sb_appendf(&sb, "012345678%d", 9) == -1);
+    TEST_ASSERT(sb_appendf(&sb, "012345678%d", 9) == -1);
     // sb should remain unchanged
-    assert(sb.len == ((size_t)-1) - 10);
-    assert(data == sb.data);
-    assert(cap == sb.cap);
+    TEST_ASSERT(sb.len == ((size_t)-1) - 10);
+    TEST_ASSERT(data == sb.data);
+    TEST_ASSERT(cap == sb.cap);
     
     sb.len = 0;
     sb_free(&sb);
+
+    return true;
 }
 
 int main() {
-    test_sb_basic_append();
-    test_sb_formatting();
-    test_sb_growth();
-    test_sb_file_io();
-    test_sb_reset_and_concat();
-    test_sb_n_append();
-    test_sb_appendln();
-    test_sb_appendz();
-    test_sb_append_to_file();
-    test_sb_reserve_power_of_two();
-    test_sb_n_append_state_corruption();
-    test_sb_appendf_preallocated();
-    test_sb_n_append_realloc_bug();
-    test_sb_oom_crashes();
+    TEST(sb_basic_append);
+    TEST(sb_formatting);
+    TEST(sb_growth);
+    TEST(sb_file_io);
+    TEST(sb_reset_and_concat);
+    TEST(test_sb_n_append);
+    TEST(test_sb_appendln);
+    TEST(test_sb_appendz);
+    TEST(test_sb_append_to_file);
+    TEST(sb_reserve_power_of_two);
+    TEST(sb_n_append_state_corruption);
+    TEST(sb_appendf_preallocated);
+    TEST(sb_n_append_realloc_bug);
+    TEST(sb_oom_crashes);
 
-    printf("\nAll sb.h tests passed successfully!\n");
-
+    REPORT("sb.h");
     return 0;
 }
